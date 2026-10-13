@@ -11,32 +11,17 @@ export default function App() {
     const token = sessionStorage.getItem("token");
 
     if (!token) {
+      setCheckingSession(false);
       return;
     }
 
-    let cancelled = false;
-
     getCurrentUser()
-      .then((result) => {
-        if (!cancelled) {
-          setUser(result.user || result.data || null);
-        }
-      })
+      .then((result) => setUser(result.user || result.data || null))
       .catch(() => {
-        if (!cancelled) {
-          sessionStorage.removeItem("token");
-          setUser(null);
-        }
+        sessionStorage.removeItem("token");
+        setUser(null);
       })
-      .finally(() => {
-        if (!cancelled) {
-          setCheckingSession(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      .finally(() => setCheckingSession(false));
   }, []);
 
   function handleLogout() {

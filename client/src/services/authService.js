@@ -1,4 +1,6 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+console.log(import.meta.env.VITE_API_URL); // Log the API_URL to verify it's being read correctly
 async function request(path, body) {
   const rseponse = await fetch(`${API_URL}/api/auth/${path}`, {
     method: "POST",
