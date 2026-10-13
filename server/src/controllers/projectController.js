@@ -3,7 +3,7 @@ const Project = require("../models/Project");
 const Task = require("../models/Task");
 const createProject = async (req, res, next) => {
   try {
-    const { name, description = "" } = req.body;
+    const { name, description = "", isActive } = req.body;
 
     if (typeof name !== "string" || !name.trim()) {
       return res.status(400).json({
@@ -11,11 +11,22 @@ const createProject = async (req, res, next) => {
         message: "Project name is required.",
       });
     }
+    if (isActive !== undefined) {
+      if (typeof isActive !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          message: "Project active status must be a boolean.",
+        });
+      }
+
+      updates.isActive = isActive;
+    }
 
     const project = await Project.create({
       name: name.trim(),
       description: description.trim(),
       owner: req.user._id,
+      isActive: isActive !== undefined ? isActive : true,
     });
 
     return res.status(201).json({
@@ -68,7 +79,7 @@ const getProject = async (req, res, next) => {
 
 const updateProject = async (req, res, next) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, isActive } = req.body;
     const updates = {};
 
     if (name !== undefined) {
@@ -88,6 +99,15 @@ const updateProject = async (req, res, next) => {
         });
       }
       updates.description = description.trim();
+    }
+    if (isActive !== undefined) {
+      if (typeof isActive !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          message: "Project active status must be a boolean.",
+        });
+      }
+      updates.isActive = isActive;
     }
     if (!Object.keys(updates).length) {
       return res.status(400).json({

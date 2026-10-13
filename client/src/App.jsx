@@ -11,17 +11,32 @@ export default function App() {
     const token = sessionStorage.getItem("token");
 
     if (!token) {
-      setCheckingSession(false);
       return;
     }
 
+    let cancelled = false;
+
     getCurrentUser()
-      .then((result) => setUser(result.user || result.data || null))
-      .catch(() => {
-        sessionStorage.removeItem("token");
-        setUser(null);
+      .then((result) => {
+        if (!cancelled) {
+          setUser(result.user || result.data || null);
+        }
       })
-      .finally(() => setCheckingSession(false));
+      .catch(() => {
+        if (!cancelled) {
+          sessionStorage.removeItem("token");
+          setUser(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCheckingSession(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function handleLogout() {
@@ -31,7 +46,7 @@ export default function App() {
 
   if (checkingSession) {
     return (
-      <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-300">
+      <main className=" min-h-screen place-items-center bg-slate-950 text-slate-300">
         Loading your workspace...
       </main>
     );

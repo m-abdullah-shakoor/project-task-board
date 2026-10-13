@@ -13,7 +13,7 @@ const findOwnedProject = async (projectId, userId) =>
 const createTask = async (req, res, next) => {
   try {
     const { projectId } = req.params;
-    const { title, description = "", status, priority } = req.body;
+    const { title, description = "", status, priority, dueDate } = req.body;
 
     if (!isValidId(projectId)) {
       return res.status(400).json({
@@ -51,11 +51,21 @@ const createTask = async (req, res, next) => {
       });
     }
 
+    if (dueDate !== undefined && dueDate !== null && dueDate !== "") {
+      if (typeof dueDate !== "string" || Number.isNaN(Date.parse(dueDate))) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid task due date.",
+        });
+      }
+    }
+
     const task = await Task.create({
       title: title.trim(),
       description: description.trim(),
       status: status || "todo",
       priority: priority || "medium",
+      dueDate: dueDate || null,
       project: project._id,
       owner: req.user._id,
     });
@@ -120,7 +130,7 @@ const getTasks = async (req, res, next) => {
 const updateTask = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { title, description, status, priority } = req.body;
+    const { title, description, status, priority, dueDate } = req.body;
     if (!isValidId(id)) {
       return res.status(400).json({
         success: false,
@@ -166,6 +176,21 @@ const updateTask = async (req, res, next) => {
       updates.priority = priority;
     }
 
+    if (dueDate !== undefined) {
+      if (dueDate === null || dueDate === "") {
+        updates.dueDate = null;
+      } else {
+        if (typeof dueDate !== "string" || Number.isNaN(Date.parse(dueDate))) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid task due date.",
+          });
+        }
+
+        updates.dueDate = new Date(dueDate);
+      }
+    }
+
     if (!Object.keys(updates).length) {
       return res.status(400).json({
         success: false,
@@ -193,7 +218,6 @@ const updateTask = async (req, res, next) => {
     next(error);
   }
 };
-
 
 const deleteTask = async (req, res, next) => {
   try {
@@ -224,5 +248,5 @@ module.exports = {
   createTask,
   getTasks,
   updateTask,
-  deleteTask
+  deleteTask,
 };

@@ -14,6 +14,10 @@ const projectSchema = new mongoose.Schema(
       maxlength: 1000,
       default: "",
     },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
     owner: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

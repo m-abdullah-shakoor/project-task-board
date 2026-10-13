@@ -6,28 +6,44 @@ import {
   deleteTask,
   getProjects,
   getTasks,
+  updateProject,
   updateTask,
 } from "../services/api";
-
-const columns = [
-  { id: "todo", label: "To Do", color: "bg-slate-500" },
-  { id: "in-progress", label: "In Progress", color: "bg-indigo-500" },
-  { id: "completed", label: "Completed", color: "bg-emerald-500" },
-];
-
-const priorityColors = {
-  low: "text-slate-400",
-  medium: "text-amber-400",
-  high: "text-red-400",
-};
+import DashboardHeader from "../components/dashboard/DashboardHeader";
+import EmptyState from "../components/dashboard/EmptyState";
+import ErrorMessage from "../components/dashboard/ErrorMessage";
+import LoadingScreen from "../components/dashboard/LoadingScreen";
+import ProjectModal from "../components/dashboard/ProjectModal";
+import Sidebar from "../components/dashboard/Sidebar";
+import TaskBoard from "../components/dashboard/TaskBoard";
+import TaskFilters from "../components/dashboard/TaskFilters";
+import TaskForm from "../components/dashboard/TaskForm";
+import {
+  columns,
+  isOverdue,
+  isProjectActive,
+  matchesDueFilter,
+  overdueColumn,
+  todayKey,
+} from "../utils/taskHelpers";
 
 export default function Dashboard({ user, onLogout }) {
   const [projects, setProjects] = useState([]);
   const [activeProject, setActiveProject] = useState("");
   const [tasks, setTasks] = useState([]);
   const [projectName, setProjectName] = useState("");
+  const [projectDescription, setProjectDescription] = useState("");
+  const [projectModalOpen, setProjectModalOpen] = useState(false);
+  const [projectFormError, setProjectFormError] = useState("");
+  const [projectFilter, setProjectFilter] = useState("all");
+  const [statusUpdating, setStatusUpdating] = useState(false);
   const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
   const [taskPriority, setTaskPriority] = useState("medium");
+  const [taskDueDate, setTaskDueDate] = useState("");
+  const [taskSearch, setTaskSearch] = useState("");
+  const [taskStatusFilter, setTaskStatusFilter] = useState("all");
+  const [taskDueFilter, setTaskDueFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -90,24 +106,84 @@ export default function Dashboard({ user, onLogout }) {
     };
   }, [activeProject]);
 
+  useEffect(() => {
+    if (!projectModalOpen) return;
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape" && !busy) closeProjectModal();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [projectModalOpen, busy]);
+
+  function openProjectModal() {
+    setProjectName("");
+    setProjectDescription("");
+    setProjectFormError("");
+    setProjectModalOpen(true);
+  }
+
+  function closeProjectModal() {
+    setProjectModalOpen(false);
+    setProjectFormError("");
+  }
+
   async function handleCreateProject(event) {
     event.preventDefault();
-    if (!projectName.trim()) return;
+    if (busy) return;
+    if (!projectName.trim()) {
+      setProjectFormError("Project name is required.");
+      return;
+    }
 
     setBusy(true);
     setError("");
+    setProjectFormError("");
 
     try {
-      const result = await createProject({ name: projectName.trim() });
+      // isActive is omitted: the server defaults new projects to active.
+      const result = await createProject({
+        name: projectName.trim(),
+        description: projectDescription.trim(),
+      });
       const project = result.data;
 
       setProjects((current) => [project, ...current]);
       setActiveProject(project._id);
       setProjectName("");
+      setProjectDescription("");
+      setProjectModalOpen(false);
+    } catch (err) {
+      setProjectFormError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleToggleProjectActive(project) {
+    if (statusUpdating) return;
+    const nextActive = !isProjectActive(project);
+
+    setStatusUpdating(true);
+    setError("");
+
+    try {
+      const result = await updateProject(project._id, { isActive: nextActive });
+      const updated = result.data;
+
+      // Only report success if the server actually saved the new value.
+      if (!updated || updated.isActive !== nextActive) {
+        throw new Error("The server did not save the project's active status.");
+      }
+
+      setProjects((current) =>
+        current.map((item) => (item._id === updated._id ? updated : item)),
+      );
     } catch (err) {
       setError(err.message);
     } finally {
-      setBusy(false);
+      setStatusUpdating(false);
     }
   }
 
@@ -121,12 +197,16 @@ export default function Dashboard({ user, onLogout }) {
     try {
       const result = await createTask(activeProject, {
         title: taskTitle.trim(),
+        description: taskDescription.trim(),
         priority: taskPriority,
+        ...(taskDueDate ? { dueDate: taskDueDate } : {}),
       });
 
       setTasks((current) => [result.data, ...current]);
       setTaskTitle("");
+      setTaskDescription("");
       setTaskPriority("medium");
+      setTaskDueDate("");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -178,238 +258,149 @@ export default function Dashboard({ user, onLogout }) {
     }
   }
 
-  const activeProjectName =
-    projects.find((project) => project._id === activeProject)?.name ||
-    "Select a project";
+  const activeProjectData = projects.find(
+    (project) => project._id === activeProject,
+  );
+
+  // Filtering only changes what is listed; the selection is left untouched.
+  const visibleProjects = projects.filter((project) => {
+    if (projectFilter === "active") return isProjectActive(project);
+    if (projectFilter === "inactive") return !isProjectActive(project);
+    return true;
+  });
+
+  const today = todayKey();
+  const searchTerm = taskSearch.trim().toLowerCase();
+  const filtersApplied =
+    Boolean(searchTerm) ||
+    taskStatusFilter !== "all" ||
+    taskDueFilter !== "all";
+
+  const filteredTasks = tasks.filter((task) => {
+    if (
+      searchTerm &&
+      !task.title.toLowerCase().includes(searchTerm) &&
+      !(task.description || "").toLowerCase().includes(searchTerm)
+    ) {
+      return false;
+    }
+    if (taskStatusFilter === "overdue") {
+      if (!isOverdue(task, today)) return false;
+    } else if (taskStatusFilter !== "all" && task.status !== taskStatusFilter) {
+      return false;
+    }
+    return matchesDueFilter(task, taskDueFilter, today);
+  });
+
+  // Overdue tasks move to their own section instead of their status column.
+  const boardColumns = [...columns, overdueColumn].map((column) => ({
+    ...column,
+    tasks: filteredTasks.filter((task) =>
+      column.id === "overdue"
+        ? isOverdue(task, today)
+        : task.status === column.id && !isOverdue(task, today),
+    ),
+  }));
+  const projectStats = [...columns, overdueColumn].map((column) => ({
+    id: column.id,
+    label: column.label,
+    color: column.color,
+    count: tasks.filter((task) =>
+      column.id === "overdue"
+        ? isOverdue(task, today)
+        : task.status === column.id && !isOverdue(task, today),
+    ).length,
+  }));
 
   if (loading) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-300">
-        Loading your workspace...
-      </main>
-    );
+    return <LoadingScreen />;
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 md:flex">
-      <aside className="flex w-full flex-col border-b border-slate-800 bg-slate-900 p-5 md:min-h-screen md:w-64 md:border-b-0 md:border-r">
-        <div className="mb-8 flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-xl bg-indigo-600 font-bold">
-            T
-          </div>
-          <div>
-            <h1 className="font-bold">Task Board</h1>
-            <p className="text-xs text-slate-500">Your workspace</p>
-          </div>
-        </div>
+    <main className="min-h-screen w-full bg-[#F7F7F2] text-[#26352B] md:flex ">
+      <Sidebar
+        projects={projects}
+        visibleProjects={visibleProjects}
+        activeProject={activeProject}
+        projectFilter={projectFilter}
+        onProjectFilterChange={setProjectFilter}
+        onSelectProject={setActiveProject}
+        onAddProject={openProjectModal}
+        user={user}
+        onLogout={onLogout}
+      />
 
-        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
-          Projects
-        </p>
-
-        <nav className="flex flex-wrap gap-2 md:flex-col">
-          {projects.map((project) => (
-            <button
-              key={project._id}
-              onClick={() => setActiveProject(project._id)}
-              className={`rounded-lg px-3 py-2 text-left text-sm transition ${
-                activeProject === project._id
-                  ? "bg-indigo-600/20 text-indigo-300"
-                  : "text-slate-400 hover:bg-slate-800 hover:text-white"
-              }`}
-            >
-              <span className="mr-2">▦</span>
-              {project.name}
-            </button>
-          ))}
-        </nav>
-
-        <form onSubmit={handleCreateProject} className="mt-4 flex gap-2">
-          <input
-            value={projectName}
-            onChange={(event) => setProjectName(event.target.value)}
-            placeholder="New project"
-            maxLength={100}
-            aria-label="New project name"
-            className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+      <section className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
+        <div className="w-full space-y-6">
+          <DashboardHeader
+            project={activeProjectData}
+            statusUpdating={statusUpdating}
+            onToggleActive={handleToggleProjectActive}
+            onDeleteProject={handleDeleteProject}
+            stats={projectStats}
           />
-          <button
-            disabled={busy || !projectName.trim()}
-            aria-label="Create project"
-            className="rounded-lg bg-slate-800 px-3 text-indigo-300 hover:bg-slate-700 disabled:opacity-50"
-          >
-            +
-          </button>
-        </form>
 
-        <div className="mt-8 border-t border-slate-800 pt-5 md:mt-auto">
-          <p className="truncate text-sm font-medium">
-            {user?.name || user?.email || "Signed-in user"}
-          </p>
-          <p className="mt-1 truncate text-xs text-slate-500">{user?.email}</p>
-          <button
-            onClick={onLogout}
-            className="mt-4 text-sm text-slate-400 hover:text-white"
-          >
-            Sign out ↗
-          </button>
-        </div>
-      </aside>
+          {error && <ErrorMessage message={error} />}
 
-      <section className="min-w-0 flex-1 p-5 md:p-8">
-        <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="mb-2 text-sm text-indigo-400">WORKSPACE / PROJECTS</p>
-            <h2 className="text-3xl font-bold tracking-tight">
-              {activeProjectName}
-            </h2>
-            <p className="mt-2 text-sm text-slate-400">
-              Keep your work moving, one task at a time.
-            </p>
-          </div>
-
-          {activeProject && (
-            <button
-              onClick={handleDeleteProject}
-              className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-400 hover:border-red-500/50 hover:text-red-400"
-            >
-              Delete project
-            </button>
-          )}
-        </header>
-
-        {error && (
-          <div
-            role="alert"
-            className="mb-5 rounded-lg border border-red-900 bg-red-950/50 p-3 text-sm text-red-300"
-          >
-            {error}
-          </div>
-        )}
-
-        {activeProject ? (
-          <>
-            <form
-              onSubmit={handleCreateTask}
-              className="mb-8 flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4 sm:flex-row"
-            >
-              <input
-                value={taskTitle}
-                onChange={(event) => setTaskTitle(event.target.value)}
-                placeholder="What needs to get done?"
-                maxLength={200}
-                aria-label="Task title"
-                className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-sm outline-none focus:border-indigo-500"
+          {activeProject ? (
+            <>
+              <TaskForm
+                title={taskTitle}
+                description={taskDescription}
+                priority={taskPriority}
+                dueDate={taskDueDate}
+                busy={busy}
+                onTitleChange={setTaskTitle}
+                onDescriptionChange={setTaskDescription}
+                onPriorityChange={setTaskPriority}
+                onDueDateChange={setTaskDueDate}
+                onSubmit={handleCreateTask}
               />
 
-              <select
-                value={taskPriority}
-                onChange={(event) => setTaskPriority(event.target.value)}
-                aria-label="Task priority"
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-3 text-sm outline-none"
-              >
-                <option value="low">Low priority</option>
-                <option value="medium">Medium priority</option>
-                <option value="high">High priority</option>
-              </select>
+              <TaskFilters
+                search={taskSearch}
+                statusFilter={taskStatusFilter}
+                dueFilter={taskDueFilter}
+                onSearchChange={setTaskSearch}
+                onStatusFilterChange={setTaskStatusFilter}
+                onDueFilterChange={setTaskDueFilter}
+              />
 
-              <button
-                disabled={busy || !taskTitle.trim()}
-                className="rounded-lg bg-indigo-600 px-5 py-3 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-50"
-              >
-                + Add task
-              </button>
-            </form>
-
-            <div className="grid gap-5 xl:grid-cols-3">
-              {columns.map((column) => {
-                const columnTasks = tasks.filter(
-                  (task) => task.status === column.id,
-                );
-
-                return (
-                  <section key={column.id} className="min-w-0">
-                    <header className="mb-4 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`size-2 rounded-full ${column.color}`}
-                        />
-                        <h3 className="font-semibold">{column.label}</h3>
-                        <span className="rounded-md bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
-                          {columnTasks.length}
-                        </span>
-                      </div>
-                    </header>
-
-                    <div className="space-y-3">
-                      {columnTasks.map((task) => (
-                        <article
-                          key={task._id}
-                          className="rounded-xl border border-slate-800 bg-slate-900 p-4 transition hover:border-slate-700"
-                        >
-                          <h4 className="wrap-break-words font-medium">
-                            {task.title}
-                          </h4>
-
-                          {task.description && (
-                            <p className="mt-2 wrap-break-words text-sm text-slate-400">
-                              {task.description}
-                            </p>
-                          )}
-
-                          <p
-                            className={`mt-4 text-xs font-semibold uppercase ${priorityColors[task.priority] || priorityColors.medium}`}
-                          >
-                            {task.priority || "medium"} priority
-                          </p>
-
-                          <div className="mt-4 flex items-center gap-2">
-                            <select
-                              aria-label={`Status for ${task.title}`}
-                              value={task.status}
-                              onChange={(event) =>
-                                handleStatusChange(task, event.target.value)
-                              }
-                              className="min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-950 px-2 py-2 text-xs outline-none focus:border-indigo-500"
-                            >
-                              {columns.map((option) => (
-                                <option key={option.id} value={option.id}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-
-                            <button
-                              onClick={() => handleDeleteTask(task._id)}
-                              aria-label={`Delete ${task.title}`}
-                              className="rounded-md px-2 py-2 text-slate-500 hover:bg-red-950 hover:text-red-400"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </article>
-                      ))}
-
-                      {columnTasks.length === 0 && (
-                        <div className="rounded-xl border border-dashed border-slate-800 p-6 text-center text-sm text-slate-600">
-                          No tasks here yet
-                        </div>
-                      )}
-                    </div>
-                  </section>
-                );
-              })}
-            </div>
-          </>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-slate-800 p-10 text-center">
-            <h3 className="text-xl font-semibold">Start with a project</h3>
-            <p className="mt-2 text-sm text-slate-400">
-              Create a project in the sidebar to start organizing tasks.
-            </p>
-          </div>
-        )}
+              <div className="rounded-2xl border border-[#E3E7DF] bg-[#F0F1E9] p-3 sm:p-4">
+                <TaskBoard
+                  columns={boardColumns}
+                  filtersApplied={filtersApplied}
+                  onStatusChange={handleStatusChange}
+                  onDeleteTask={handleDeleteTask}
+                />
+              </div>
+            </>
+          ) : (
+            <EmptyState
+              title="Start with a project"
+              className="flex min-h-[55vh] flex-col items-center justify-center rounded-2xl border border-dashed border-[#D5DBD2] bg-white p-8 text-center sm:p-12"
+            >
+              <p className="mt-3 max-w-md text-sm leading-6 text-[#6B756C]">
+                Create a project from the sidebar to start organizing tasks,
+                setting deadlines, and tracking your progress.
+              </p>
+            </EmptyState>
+          )}
+        </div>
       </section>
+
+      {projectModalOpen && (
+        <ProjectModal
+          name={projectName}
+          description={projectDescription}
+          formError={projectFormError}
+          busy={busy}
+          onNameChange={setProjectName}
+          onDescriptionChange={setProjectDescription}
+          onSubmit={handleCreateProject}
+          onClose={closeProjectModal}
+        />
+      )}
     </main>
   );
 }

@@ -1,4 +1,3 @@
-
 const mongoose = require("mongoose");
 
 const taskSchema = new mongoose.Schema(
@@ -26,6 +25,10 @@ const taskSchema = new mongoose.Schema(
       enum: ["low", "medium", "high"],
       default: "medium",
     },
+    dueDate: {
+      type: Date,
+      default: null,
+    },
     project: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Project",
@@ -41,7 +44,7 @@ const taskSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 taskSchema.index({ owner: 1, project: 1, status: 1 });

@@ -47,8 +47,13 @@ export function createTask(projectId, task) {
 }
 
 export function updateTask(taskId, updates) {
-  console.log("Updating task:", { taskId, updates });
   return apiRequest(`/tasks/${taskId}`, {
+    method: "PUT",
+    body: JSON.stringify(updates),
+  });
+}
+export function updateProject(projectId, updates) {
+  return apiRequest(`/projects/${projectId}`, {
     method: "PUT",
     body: JSON.stringify(updates),
   });
