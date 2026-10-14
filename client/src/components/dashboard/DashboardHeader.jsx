@@ -5,6 +5,7 @@ export default function DashboardHeader({
   project,
   statusUpdating,
   onToggleActive,
+  onEditProject,
   onDeleteProject,
   stats = [],
 }) {
@@ -46,6 +47,13 @@ export default function DashboardHeader({
         {/* Actions */}
         {project && (
           <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onEditProject}
+              className="rounded-lg border border-[#D5DBD2] bg-white px-3 py-2 text-sm text-[#26352B] hover:bg-[#EDF2EB]"
+            >
+              Edit project
+            </button>
             <button
               type="button"
               onClick={() => onToggleActive(project)}

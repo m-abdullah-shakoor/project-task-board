@@ -5,6 +5,7 @@ export default function BoardColumn({
   column,
   filtersApplied,
   onStatusChange,
+  onEditTask,
   onDeleteTask,
 }) {
   return (
@@ -26,6 +27,7 @@ export default function BoardColumn({
             task={task}
             overdue={column.id === "overdue"}
             onStatusChange={onStatusChange}
+            onEdit={onEditTask}
             onDelete={onDeleteTask}
           />
         ))}

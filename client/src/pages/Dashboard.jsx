@@ -10,6 +10,7 @@ import {
   updateTask,
 } from "../services/api";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
+import EditTaskModal from "../components/dashboard/EditTaskModal";
 import EmptyState from "../components/dashboard/EmptyState";
 import ErrorMessage from "../components/dashboard/ErrorMessage";
 import LoadingScreen from "../components/dashboard/LoadingScreen";
@@ -34,6 +35,8 @@ export default function Dashboard({ user, onLogout }) {
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
   const [projectModalOpen, setProjectModalOpen] = useState(false);
+  const [projectModalMode, setProjectModalMode] = useState("create");
+  const [editingTask, setEditingTask] = useState(null);
   const [projectFormError, setProjectFormError] = useState("");
   const [projectFilter, setProjectFilter] = useState("all");
   const [statusUpdating, setStatusUpdating] = useState(false);
@@ -118,8 +121,20 @@ export default function Dashboard({ user, onLogout }) {
   }, [projectModalOpen, busy]);
 
   function openProjectModal() {
+    setProjectModalMode("create");
     setProjectName("");
     setProjectDescription("");
+    setProjectFormError("");
+    setProjectModalOpen(true);
+  }
+
+  function openEditProjectModal() {
+    const project = projects.find((item) => item._id === activeProject);
+    if (!project) return;
+
+    setProjectModalMode("edit");
+    setProjectName(project.name);
+    setProjectDescription(project.description || "");
     setProjectFormError("");
     setProjectModalOpen(true);
   }
@@ -153,6 +168,36 @@ export default function Dashboard({ user, onLogout }) {
       setActiveProject(project._id);
       setProjectName("");
       setProjectDescription("");
+      setProjectModalOpen(false);
+    } catch (err) {
+      setProjectFormError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleEditProject(event) {
+    event.preventDefault();
+    if (busy) return;
+    if (!projectName.trim()) {
+      setProjectFormError("Project name is required.");
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+    setProjectFormError("");
+
+    try {
+      const result = await updateProject(activeProject, {
+        name: projectName.trim(),
+        description: projectDescription.trim(),
+      });
+      const updated = result.data;
+
+      setProjects((current) =>
+        current.map((item) => (item._id === updated._id ? updated : item)),
+      );
       setProjectModalOpen(false);
     } catch (err) {
       setProjectFormError(err.message);
@@ -225,6 +270,19 @@ export default function Dashboard({ user, onLogout }) {
     } catch (err) {
       setError(err.message);
     }
+  }
+
+  function closeEditTaskModal() {
+    setEditingTask(null);
+  }
+
+  // Errors are rethrown so the edit modal can show them and stay open.
+  async function handleSaveTask(taskId, updates) {
+    const result = await updateTask(taskId, updates);
+    setTasks((current) =>
+      current.map((item) => (item._id === taskId ? result.data : item)),
+    );
+    setEditingTask(null);
   }
 
   async function handleDeleteTask(taskId) {
@@ -336,6 +394,7 @@ export default function Dashboard({ user, onLogout }) {
             project={activeProjectData}
             statusUpdating={statusUpdating}
             onToggleActive={handleToggleProjectActive}
+            onEditProject={openEditProjectModal}
             onDeleteProject={handleDeleteProject}
             stats={projectStats}
           />
@@ -371,6 +430,7 @@ export default function Dashboard({ user, onLogout }) {
                   columns={boardColumns}
                   filtersApplied={filtersApplied}
                   onStatusChange={handleStatusChange}
+                  onEditTask={setEditingTask}
                   onDeleteTask={handleDeleteTask}
                 />
               </div>
@@ -391,14 +451,26 @@ export default function Dashboard({ user, onLogout }) {
 
       {projectModalOpen && (
         <ProjectModal
+          mode={projectModalMode}
           name={projectName}
           description={projectDescription}
           formError={projectFormError}
           busy={busy}
           onNameChange={setProjectName}
           onDescriptionChange={setProjectDescription}
-          onSubmit={handleCreateProject}
+          onSubmit={
+            projectModalMode === "edit" ? handleEditProject : handleCreateProject
+          }
           onClose={closeProjectModal}
+        />
+      )}
+
+      {editingTask && (
+        <EditTaskModal
+          key={editingTask._id}
+          task={editingTask}
+          onSave={handleSaveTask}
+          onClose={closeEditTaskModal}
         />
       )}
     </main>

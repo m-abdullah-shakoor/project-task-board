@@ -1,6 +1,7 @@
 import { fieldClass, primaryButtonClass } from "../../utils/taskHelpers";
 
 export default function ProjectModal({
+  mode = "create",
   name,
   description,
   formError,
@@ -28,7 +29,7 @@ export default function ProjectModal({
           id="project-modal-title"
           className="text-lg font-semibold text-[#26352B]"
         >
-          New project
+          {mode === "edit" ? "Edit project" : "New project"}
         </h2>
 
         <form onSubmit={onSubmit} noValidate className="mt-5 space-y-4">
@@ -81,7 +82,13 @@ export default function ProjectModal({
               disabled={busy}
               className={`${primaryButtonClass} px-4 py-2.5`}
             >
-              {busy ? "Creating..." : "Create"}
+              {mode === "edit"
+                ? busy
+                  ? "Saving..."
+                  : "Save changes"
+                : busy
+                  ? "Creating..."
+                  : "Create"}
             </button>
           </div>
         </form>

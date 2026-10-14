@@ -7,7 +7,13 @@ import {
   priorityColors,
 } from "../../utils/taskHelpers";
 
-export default function TaskCard({ task, overdue, onStatusChange, onDelete }) {
+export default function TaskCard({
+  task,
+  overdue,
+  onStatusChange,
+  onEdit,
+  onDelete,
+}) {
   const dueKey = dueDateKey(task.dueDate);
 
   return (
@@ -58,6 +64,14 @@ export default function TaskCard({ task, overdue, onStatusChange, onDelete }) {
             </option>
           ))}
         </select>
+
+        <button
+          onClick={() => onEdit(task)}
+          aria-label={`Edit ${task.title}`}
+          className="rounded-md px-2 py-2 text-sm text-[#536B57] hover:bg-[#EDF2EB]"
+        >
+          Edit
+        </button>
 
         <button
           onClick={() => onDelete(task._id)}

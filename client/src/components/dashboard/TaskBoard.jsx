@@ -4,6 +4,7 @@ export default function TaskBoard({
   columns,
   filtersApplied,
   onStatusChange,
+  onEditTask,
   onDeleteTask,
 }) {
   return (
@@ -14,6 +15,7 @@ export default function TaskBoard({
           column={column}
           filtersApplied={filtersApplied}
           onStatusChange={onStatusChange}
+          onEditTask={onEditTask}
           onDeleteTask={onDeleteTask}
         />
       ))}
