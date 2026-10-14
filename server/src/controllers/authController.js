@@ -111,7 +111,6 @@ const login = async (req, res) => {
       email: email.trim().toLowerCase(),
     }).select("+password");
 
-    // Use a generic response to avoid revealing whether an email exists.
     if (!user || !user.password) {
       return res.status(401).json({
         success: false,
