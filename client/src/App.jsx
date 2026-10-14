@@ -5,15 +5,13 @@ import { getCurrentUser } from "./services/api";
 
 export default function App() {
   const [user, setUser] = useState(null);
-  const [checkingSession, setCheckingSession] = useState(true);
+  // Only a stored token needs checking; without one, go straight to login.
+  const [checkingSession, setCheckingSession] = useState(() =>
+    Boolean(sessionStorage.getItem("token")),
+  );
 
   useEffect(() => {
-    const token = sessionStorage.getItem("token");
-
-    if (!token) {
-      setCheckingSession(false);
-      return;
-    }
+    if (!sessionStorage.getItem("token")) return;
 
     getCurrentUser()
       .then((result) => setUser(result.user || result.data || null))

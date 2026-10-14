@@ -123,7 +123,7 @@ const updateProject = async (req, res, next) => {
     const project = await Project.findOneAndUpdate(
       { _id: req.params.id, owner: req.user._id },
       updates,
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
     if (!project) {
       return res.status(404).json({
