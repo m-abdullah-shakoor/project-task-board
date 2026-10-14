@@ -18,8 +18,12 @@ const createProject = async (req, res, next) => {
           message: "Project active status must be a boolean.",
         });
       }
-
-      updates.isActive = isActive;
+    }
+    if (typeof description !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Project description must be a string.",
+      });
     }
 
     const project = await Project.create({
