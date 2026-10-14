@@ -1,5 +1,31 @@
+import { useState } from "react";
 import ProjectList from "./ProjectList";
 import { fieldClass } from "../../utils/taskHelpers";
+
+// Shows the Google profile picture, or the user's initial when there is no
+// picture (email signups) or it fails to load.
+function UserAvatar({ user }) {
+  const [failed, setFailed] = useState(false);
+  const initial = (user?.name || user?.email || "?").charAt(0).toUpperCase();
+
+  if (user?.picture && !failed) {
+    return (
+      <img
+        src={user.picture}
+        alt=""
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+        className="size-10 shrink-0 rounded-full border border-[#E3E7DF] object-cover"
+      />
+    );
+  }
+
+  return (
+    <div className="grid size-10 shrink-0 place-items-center rounded-full bg-[#EDF2EB] text-sm font-semibold text-[#536B57]">
+      {initial}
+    </div>
+  );
+}
 
 export default function Sidebar({
   projects,
@@ -64,10 +90,15 @@ export default function Sidebar({
       </button>
 
       <div className="mt-8 border-t border-[#E3E7DF] pt-5 md:mt-auto">
-        <p className="truncate text-sm font-medium text-[#26352B]">
-          {user?.name || user?.email || "Signed-in user"}
-        </p>
-        <p className="mt-1 truncate text-xs text-[#6B756C]">{user?.email}</p>
+        <div className="flex items-center gap-3">
+          <UserAvatar user={user} />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-[#26352B]">
+              {user?.name || user?.email || "Signed-in user"}
+            </p>
+            <p className="mt-1 truncate text-xs text-[#6B756C]">{user?.email}</p>
+          </div>
+        </div>
         <button
           onClick={onLogout}
           className="mt-4 rounded-md text-sm text-[#6B756C] hover:text-[#26352B]"
