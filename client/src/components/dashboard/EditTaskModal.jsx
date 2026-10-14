@@ -36,7 +36,6 @@ export default function EditTaskModal({ task, onSave, onClose }) {
     setFormError("");
 
     try {
-      // An empty due date clears it on the server.
       await onSave(task._id, {
         title: title.trim(),
         description: description.trim(),

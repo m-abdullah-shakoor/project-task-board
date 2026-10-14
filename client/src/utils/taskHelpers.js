@@ -7,7 +7,6 @@ export const columns = [
   { id: "completed", label: "Completed", color: "bg-emerald-500" },
 ];
 
-// "Overdue" is derived on the client; it is never sent as a task status.
 export const overdueColumn = {
   id: "overdue",
   label: "Overdue",
@@ -26,15 +25,11 @@ export const fieldClass =
 export const primaryButtonClass =
   "rounded-lg bg-[#66816A] text-sm font-semibold text-white hover:bg-[#536B57] disabled:cursor-not-allowed disabled:opacity-50";
 
-// Projects saved before isActive existed have no value; the backend default
-// is true, so they are treated as active (display only, nothing is saved).
+
 export function isProjectActive(project) {
   return project.isActive !== false;
 }
 
-// Due dates are picked as calendar days ("YYYY-MM-DD") and stored by the
-// server as UTC midnight, so the calendar day is the ISO string's date part.
-// Reading it this way avoids shifting the day in non-UTC timezones.
 export function dueDateKey(dueDate) {
   if (typeof dueDate !== "string") return null;
   const key = dueDate.slice(0, 10);

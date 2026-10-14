@@ -1,4 +1,3 @@
-// components/dashboard/ProjectHeader.jsx
 import { isProjectActive } from "../../utils/taskHelpers";
 
 export default function DashboardHeader({

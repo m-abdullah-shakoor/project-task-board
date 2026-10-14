@@ -1,8 +1,6 @@
 import { useCallback, useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 
-// Google's button needs an explicit pixel width (200-400), so measure the
-// container once it mounts and render the button to fit it.
 export default function GoogleLoginButton({ onSuccess, onError }) {
   const [width, setWidth] = useState(0);
 
