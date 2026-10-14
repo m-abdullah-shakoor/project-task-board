@@ -101,3 +101,7 @@ Every route except `/api/health`, `/api/auth/register`, `/api/auth/login` and `/
 | GET / PUT / DELETE | `/api/projects/:id` | Get / update / delete a project (delete also removes its tasks) |
 | GET / POST | `/api/projects/:projectId/tasks` | List (`?status=`, `?priority=`) / create tasks |
 | PUT / DELETE | `/api/tasks/:id` | Update / delete a task |
+
+### AI-Assisted Development
+
+AI tools were used to support code review, repository auditing, and identifying potential improvements. All suggested changes were reviewed and validated through testing before inclusion.
